@@ -321,6 +321,62 @@ describe("translateAnthropicToCodexRequest", () => {
   // ── Thinking → reasoning effort ──────────────────────────────────────
 
   describe("thinking to reasoning effort", () => {
+    it("maps Claude Code output_config effort to reasoning effort", () => {
+      const result = translateAnthropicToCodexRequest(
+        makeRequest({
+          thinking: { type: "adaptive" },
+          output_config: { effort: "low" },
+        } as unknown as Partial<AnthropicMessagesRequest>),
+      );
+      expect(result.reasoning?.effort).toBe("low");
+    });
+
+    it("lets Claude Code output_config effort override model suffix effort", () => {
+      const result = translateAnthropicToCodexRequest(
+        makeRequest({
+          model: "gpt-5.4-high",
+          thinking: { type: "adaptive" },
+          output_config: { effort: "low" },
+        } as unknown as Partial<AnthropicMessagesRequest>),
+      );
+      expect(result.reasoning?.effort).toBe("low");
+    });
+
+    it("maps Claude Code max effort to xhigh", () => {
+      const result = translateAnthropicToCodexRequest(
+        makeRequest({
+          thinking: { type: "adaptive" },
+          output_config: { effort: "max" },
+        } as unknown as Partial<AnthropicMessagesRequest>),
+      );
+      expect(result.reasoning?.effort).toBe("xhigh");
+    });
+
+    it("lets model suffix effort override legacy thinking budget", () => {
+      const result = translateAnthropicToCodexRequest(
+        makeRequest({
+          model: "gpt-5.4-high",
+          thinking: { type: "enabled", budget_tokens: 25000 },
+        }),
+      );
+      expect(result.reasoning?.effort).toBe("high");
+    });
+
+    it("lets config default effort override legacy thinking budget", () => {
+      const result = translateAnthropicToCodexRequest(
+        makeRequest({
+          thinking: { type: "enabled", budget_tokens: 25000 },
+        }),
+        {
+          default_reasoning_effort: "high",
+          default_service_tier: null,
+          inject_desktop_context: false,
+          suppress_desktop_directives: false,
+        },
+      );
+      expect(result.reasoning?.effort).toBe("high");
+    });
+
     it("maps enabled thinking with budget_tokens to effort", () => {
       const result = translateAnthropicToCodexRequest(
         makeRequest({

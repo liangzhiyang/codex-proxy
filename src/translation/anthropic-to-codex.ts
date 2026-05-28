@@ -26,6 +26,22 @@ function hasHostedWebSearchTool(tools: unknown[]): boolean {
   return tools.some((tool) => isRecord(tool) && tool.type === "web_search");
 }
 
+const CODEX_REASONING_EFFORTS = new Set([
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+]);
+
+function normalizeOutputConfigEffort(effort: unknown): string | undefined {
+  if (effort === "max") return "xhigh";
+  return typeof effort === "string" && CODEX_REASONING_EFFORTS.has(effort)
+    ? effort
+    : undefined;
+}
+
 /**
  * Map Anthropic thinking budget_tokens to Codex reasoning effort.
  */
@@ -264,12 +280,14 @@ export function translateAnthropicToCodexRequest(
     request.tool_choice = codexToolChoice;
   }
 
-  // Reasoning effort: thinking config > suffix > config default
+  // Reasoning effort: Claude Code /effort > suffix > config default > legacy thinking budget
+  const outputConfigEffort = normalizeOutputConfigEffort(req.output_config?.effort);
   const thinkingEffort = mapThinkingToEffort(req.thinking);
   const effort =
-    thinkingEffort ??
+    outputConfigEffort ??
     parsed.reasoningEffort ??
-    cfg.default_reasoning_effort;
+    cfg.default_reasoning_effort ??
+    thinkingEffort;
   if (effort) {
     request.reasoning = { effort, summary: "auto" };
   }

@@ -94,6 +94,10 @@ const AnthropicThinkingAdaptiveSchema = z.object({
   budget_tokens: z.number().int().positive().optional(),
 });
 
+const AnthropicOutputConfigSchema = z.object({
+  effort: z.string().optional(),
+}).passthrough();
+
 export const AnthropicMessagesRequestSchema = z.object({
   model: z.string(),
   max_tokens: z.number().int().positive(),
@@ -118,6 +122,7 @@ export const AnthropicMessagesRequestSchema = z.object({
       AnthropicThinkingAdaptiveSchema,
     ])
     .optional(),
+  output_config: AnthropicOutputConfigSchema.optional(),
   // Tool-related fields. Custom tools are converted to Codex function tools;
   // Anthropic hosted web search is converted to Codex hosted web_search.
   tools: z.array(z.union([

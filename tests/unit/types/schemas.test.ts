@@ -94,6 +94,20 @@ describe("AnthropicMessagesRequestSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("preserves Claude Code output_config effort", () => {
+    const result = AnthropicMessagesRequestSchema.safeParse({
+      model: "gpt-5.4",
+      max_tokens: 4096,
+      messages: [{ role: "user", content: "Use configured effort" }],
+      thinking: { type: "adaptive" },
+      output_config: { effort: "low" },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.output_config?.effort).toBe("low");
+    }
+  });
+
   it("rejects invalid thinking type", () => {
     const result = AnthropicMessagesRequestSchema.safeParse({
       model: "gpt-5.4",
