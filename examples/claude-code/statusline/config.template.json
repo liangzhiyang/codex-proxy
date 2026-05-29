@@ -1,0 +1,35 @@
+{
+  "lineLayout": "expanded",
+  "showSeparators": false,
+  "language": "en",
+  "gitStatus": {
+    "enabled": true,
+    "showDirty": true,
+    "showAheadBehind": true,
+    "showFileStats": false
+  },
+  "colors": {
+    "label": 255
+  },
+  "display": {
+    "showModel": true,
+    "showContextBar": true,
+    "showTools": true,
+    "showAgents": true,
+    "showTodos": true,
+    "showProject": true,
+    "showConfigCounts": true,
+    "showTokenBreakdown": true,
+    "showUsage": true,
+    "showDuration": true,
+    "showSessionName": true,
+    "showSessionTokens": true,
+    "showEffortLevel": true,
+    "usageBarEnabled": true,
+    "usageCompact": true,
+    "usageValue": "percent",
+    "contextValue": "both",
+    "sevenDayThreshold": 0,
+    "externalUsagePath": "__CLAUDE_HUD_EXTERNAL_USAGE_PATH__"
+  }
+}

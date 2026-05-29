@@ -135,6 +135,16 @@ export ANTHROPIC_MODEL=gpt-5.5
 
 Claude Code 里 `/model` 控制模型名，`/effort` 控制推理等级。代理会把 Anthropic 请求转换成 Codex Responses 请求。
 
+### Claude Code Statusline
+
+仓库内置了一个基于 `claude-hud` 的 statusline 示例，用来显示 Codex usage、上下文窗口和 effort 等信息：
+
+```bash
+node examples/claude-code/statusline/install.mjs
+```
+
+详情见 [examples/claude-code/statusline](./examples/claude-code/statusline)。
+
 ## Effort 映射规则
 
 本 fork 修正了 Claude Code `/effort` 到 Codex reasoning effort 的优先级。
