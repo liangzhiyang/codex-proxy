@@ -152,6 +152,19 @@ describe("AnthropicMessagesRequestSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts inline system messages from OpenAI-style clients", () => {
+    const result = AnthropicMessagesRequestSchema.safeParse({
+      model: "gpt-5.4",
+      max_tokens: 4096,
+      messages: [
+        { role: "user", content: "Hello" },
+        { role: "system", content: "Be concise." },
+        { role: "assistant", content: "Hi" },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
   it("parses request with text block array system prompt", () => {
     const result = AnthropicMessagesRequestSchema.safeParse({
       model: "gpt-5.4",

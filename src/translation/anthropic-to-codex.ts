@@ -76,6 +76,40 @@ function normalizeSystemInstructionText(text: string): string {
   return trimmed.startsWith(BILLING_HEADER_PREFIX) ? "" : trimmed;
 }
 
+function pushNormalizedSystemText(parts: string[], text: string): void {
+  const normalized = normalizeSystemInstructionText(text);
+  if (normalized) parts.push(normalized);
+}
+
+function collectSystemInstructionParts(req: AnthropicMessagesRequest): string[] {
+  const parts: string[] = [];
+
+  if (req.system) {
+    if (typeof req.system === "string") {
+      pushNormalizedSystemText(parts, req.system);
+    } else {
+      for (const block of req.system) {
+        pushNormalizedSystemText(parts, block.text);
+      }
+    }
+  }
+
+  for (const msg of req.messages) {
+    if (msg.role !== "system") continue;
+    if (typeof msg.content === "string") {
+      pushNormalizedSystemText(parts, msg.content);
+    } else {
+      for (const block of msg.content as Array<Record<string, unknown>>) {
+        if (block.type === "text" && typeof block.text === "string") {
+          pushNormalizedSystemText(parts, block.text);
+        }
+      }
+    }
+  }
+
+  return parts;
+}
+
 /**
  * Build multimodal content (text + images) from Anthropic blocks.
  * Returns plain string if text-only, or CodexContentPart[] if images present.
@@ -212,27 +246,20 @@ export function translateAnthropicToCodexRequest(
   options?: { injectHostedWebSearch?: boolean; mapClaudeCodeWebSearch?: boolean },
 ): CodexResponsesRequest {
   // Extract system instructions
-  let userInstructions: string;
-  if (req.system) {
-    if (typeof req.system === "string") {
-      userInstructions = normalizeSystemInstructionText(req.system);
-    } else {
-      userInstructions = req.system
-        .map((b) => normalizeSystemInstructionText(b.text))
-        .filter(Boolean)
-        .join("\n\n");
-    }
-  } else {
-    userInstructions = "You are a helpful assistant.";
-  }
+  const systemInstructionParts = collectSystemInstructionParts(req);
+  const userInstructions =
+    systemInstructionParts.length > 0
+      ? systemInstructionParts.join("\n\n")
+      : "You are a helpful assistant.";
   const cfg = modelConfig ?? getConfig().model;
   const instructions = buildInstructions(userInstructions, cfg);
 
   // Build input items from messages
   const input: CodexInputItem[] = [];
   for (const msg of req.messages) {
+    if (msg.role === "system") continue;
     const items = contentToInputItems(
-      msg.role as "user" | "assistant",
+      msg.role,
       msg.content as string | Array<Record<string, unknown>>,
     );
     input.push(...items);

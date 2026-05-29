@@ -76,7 +76,10 @@ const AnthropicContentSchema = z.union([
 ]);
 
 const AnthropicMessageSchema = z.object({
-  role: z.enum(["user", "assistant"]),
+  // Anthropic proper only accepts user/assistant here; some OpenAI-style
+  // clients still send inline system messages to /v1/messages. Accept them
+  // at the proxy boundary and normalize them into top-level instructions.
+  role: z.enum(["system", "user", "assistant"]),
   content: AnthropicContentSchema,
 });
 

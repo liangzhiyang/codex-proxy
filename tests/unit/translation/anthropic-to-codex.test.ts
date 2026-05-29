@@ -79,6 +79,25 @@ describe("translateAnthropicToCodexRequest", () => {
       expect(result.instructions).toBe("Be concise.");
     });
 
+    it("moves inline system messages into instructions and excludes them from input", () => {
+      const result = translateAnthropicToCodexRequest(
+        makeRequest({
+          system: "Top-level system.",
+          messages: [
+            { role: "user", content: "Hello" },
+            { role: "system", content: "Inline system." },
+            { role: "assistant", content: "Hi" },
+          ] as unknown as AnthropicMessagesRequest["messages"],
+        }),
+      );
+
+      expect(result.instructions).toBe("Top-level system.\n\nInline system.");
+      expect(result.input).toEqual([
+        { role: "user", content: "Hello" },
+        { role: "assistant", content: "Hi" },
+      ]);
+    });
+
     it("joins text block array system into instructions", () => {
       const result = translateAnthropicToCodexRequest(
         makeRequest({
