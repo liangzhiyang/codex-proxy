@@ -1,77 +1,93 @@
 /**
  * Proxy detection and management.
  *
- * Auto-detects local proxies (mihomo/clash, v2ray, etc.) by probing common ports.
+ * Resolves the effective upstream proxy for outbound requests.
  * Called once at startup, result is cached for the process lifetime.
  */
 
-import { createConnection } from "net";
-import { lookup } from "dns/promises";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import { getConfig } from "../config.js";
 
-/**
- * Common local proxy ports to auto-detect.
- * Checked in order: mihomo/clash, v2ray, SOCKS5 common.
- */
-const PROXY_PORTS = [
-  { port: 7890, proto: "http" },   // mihomo / clash
-  { port: 7897, proto: "http" },   // clash-verge
-  { port: 10809, proto: "http" },  // v2ray HTTP
-  { port: 1080, proto: "socks5" }, // SOCKS5 common
-  { port: 10808, proto: "socks5" },// v2ray SOCKS5
-];
-
-/**
- * Hosts to probe for proxy detection.
- * 127.0.0.1 — bare-metal / host machine.
- * host.docker.internal — Docker container → host machine
- * (DNS lookup fails on bare-metal → ENOTFOUND → handled by error callback, <5ms).
- */
-const PROXY_HOSTS = ["127.0.0.1", "host.docker.internal"];
+const execFileAsync = promisify(execFile);
 
 let _proxyUrl: string | null | undefined; // undefined = not yet detected
 
-/** Probe a TCP port on the given host. Resolves true if a server is listening. */
-function probePort(host: string, port: number, timeoutMs = 500): Promise<boolean> {
-  return new Promise((resolve) => {
-    const sock = createConnection({ host, port }, () => {
-      sock.destroy();
-      resolve(true);
-    });
-    sock.setTimeout(timeoutMs);
-    sock.on("timeout", () => { sock.destroy(); resolve(false); });
-    sock.on("error", () => { resolve(false); });
-  });
+function proxyFromEnv(): string | null {
+  return (
+    process.env.HTTPS_PROXY ||
+    process.env.https_proxy ||
+    process.env.HTTP_PROXY ||
+    process.env.http_proxy ||
+    process.env.ALL_PROXY ||
+    process.env.all_proxy ||
+    null
+  );
 }
 
-/**
- * Detect a local proxy by probing common ports on localhost and Docker host.
- * Called once at startup, result is cached.
- */
-async function detectLocalProxy(): Promise<string | null> {
-  for (const host of PROXY_HOSTS) {
-    for (const { port, proto } of PROXY_PORTS) {
-      if (await probePort(host, port)) {
-        // Resolve hostname to IP to avoid DNS issues in some transports
-        let resolvedHost = host;
-        if (!/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
-          try {
-            const { address } = await lookup(host);
-            resolvedHost = address;
-          } catch { /* use original hostname as fallback */ }
-        }
-        const url = `${proto}://${resolvedHost}:${port}`;
-        console.log(`[Proxy] Auto-detected local proxy: ${url}`);
-        return url;
-      }
-    }
+function valueFromScutil(output: string, key: string): string | null {
+  const match = output.match(new RegExp(`(?:^|\\n)\\s*${key}\\s*:\\s*([^\\n]+)`));
+  return match?.[1]?.trim() || null;
+}
+
+function enabledFromScutil(output: string, key: string): boolean {
+  return valueFromScutil(output, key) === "1";
+}
+
+function makeProxyUrl(protocol: "http" | "socks5", host: string | null, port: string | null): string | null {
+  if (!host || !port || !/^\d+$/.test(port)) return null;
+  const normalizedHost = host.includes(":") && !host.startsWith("[") ? `[${host}]` : host;
+  return `${protocol}://${normalizedHost}:${port}`;
+}
+
+function proxyFromScutil(output: string): string | null {
+  if (enabledFromScutil(output, "HTTPSEnable")) {
+    const proxy = makeProxyUrl(
+      "http",
+      valueFromScutil(output, "HTTPSProxy"),
+      valueFromScutil(output, "HTTPSPort"),
+    );
+    if (proxy) return proxy;
   }
+
+  if (enabledFromScutil(output, "HTTPEnable")) {
+    const proxy = makeProxyUrl(
+      "http",
+      valueFromScutil(output, "HTTPProxy"),
+      valueFromScutil(output, "HTTPPort"),
+    );
+    if (proxy) return proxy;
+  }
+
+  if (enabledFromScutil(output, "SOCKSEnable")) {
+    return makeProxyUrl(
+      "socks5",
+      valueFromScutil(output, "SOCKSProxy"),
+      valueFromScutil(output, "SOCKSPort"),
+    );
+  }
+
   return null;
+}
+
+async function detectSystemProxy(): Promise<string | null> {
+  const envProxy = proxyFromEnv();
+  if (envProxy) return envProxy;
+
+  try {
+    const result = await execFileAsync("scutil", ["--proxy"], { timeout: 1000 });
+    const stdout = typeof result === "string" || Buffer.isBuffer(result)
+      ? result
+      : result.stdout;
+    return proxyFromScutil(String(stdout));
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Initialize proxy detection. Called once at startup from index.ts.
- * Priority: config proxy_url > auto-detect local ports.
+ * Priority: configured proxy_url > environment/system proxy > direct connection.
  */
 export async function initProxy(): Promise<void> {
   const config = getConfig();
@@ -80,10 +96,16 @@ export async function initProxy(): Promise<void> {
     console.log(`[Proxy] Using configured proxy: ${_proxyUrl}`);
     return;
   }
-  _proxyUrl = await detectLocalProxy();
-  if (!_proxyUrl) {
-    console.log("[Proxy] No local proxy detected — direct connection");
+
+  const systemProxy = await detectSystemProxy();
+  if (systemProxy) {
+    _proxyUrl = systemProxy;
+    console.log(`[Proxy] Using system proxy: ${_proxyUrl}`);
+    return;
   }
+
+  _proxyUrl = null;
+  console.log("[Proxy] No system proxy configured — direct connection");
 }
 
 /**

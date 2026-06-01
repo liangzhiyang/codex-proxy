@@ -109,7 +109,7 @@ logs:
 注意：
 
 - `proxy_api_key` 是本代理自己的访问密钥，客户端请求时使用 `Authorization: Bearer your-local-key`。
-- 如果本地使用 Shadowrocket、Clash 等代理，建议显式配置 `tls.proxy_url`。即使系统启用了 TUN / VPN 模式，进程仍可能因为路由、DNS、应用层连接方式或规则设置绕过代理。
+- 如果本地使用 Shadowrocket、Clash 等代理，可以显式配置 `tls.proxy_url`。留空时会优先读取环境变量 / macOS 系统代理；没有系统代理时直连，可由 TUN / VPN 接管。
 - 修改监听端口、默认模型、上游代理后，建议重启服务。
 
 ## Claude Code 接入

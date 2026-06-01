@@ -1,5 +1,6 @@
 import { ProxyAgent, type Dispatcher } from "undici";
 import { getConfig } from "../config.js";
+import { getProxyUrl } from "../tls/proxy.js";
 
 let cachedProxyUrl: string | null = null;
 let cachedDispatcher: Dispatcher | undefined;
@@ -7,7 +8,7 @@ let cachedDispatcher: Dispatcher | undefined;
 export function getFetchDispatcher(): Dispatcher | undefined {
   let proxyUrl: string | null = null;
   try {
-    proxyUrl = getConfig().tls.proxy_url;
+    proxyUrl = getConfig().tls.proxy_url || getProxyUrl();
   } catch {
     proxyUrl = process.env.HTTPS_PROXY ?? process.env.https_proxy ?? null;
   }

@@ -9,6 +9,7 @@ import type { RefreshScheduler } from "../auth/refresh-scheduler.js";
 import { validateManualToken } from "../auth/chatgpt-oauth.js";
 import { startOAuthFlow, refreshAccessToken } from "../auth/oauth-pkce.js";
 import { getConfig } from "../config.js";
+import { getProxyUrl } from "../tls/proxy.js";
 import { CodexApi } from "../proxy/codex-api.js";
 import type { CookieJar } from "../proxy/cookie-jar.js";
 import type { ProxyPool } from "../proxy/proxy-pool.js";
@@ -40,7 +41,7 @@ export function createAccountRoutes(pool: AccountPool, scheduler: RefreshSchedul
   const importSvc = new AccountImportService(pool, scheduler, {
     validateToken: validateManualToken,
     refreshToken: refreshAccessToken,
-    getProxyUrl: () => getConfig().tls?.proxy_url ?? null,
+    getProxyUrl,
     // Warmup disabled: sending GET /codex/usage immediately after RT exchange
     // triggers OpenAI risk detection and causes account deactivation.
     warmup: undefined,
